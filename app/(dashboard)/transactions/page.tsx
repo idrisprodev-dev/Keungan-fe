@@ -1,148 +1,196 @@
-    'use client';
+'use client';
 
-    import { useState, useEffect } from 'react';
-    import { ArrowRightLeft, Search, Filter, ArrowUpRight, ArrowDownRight, Activity } from 'lucide-react';
-import { fetchAPI } from '@/app/lib/api';
+import { useState, useEffect } from 'react';
+import { Search, Calendar, ArrowDownRight, ArrowUpRight, Filter, MoreHorizontal, Loader2 } from 'lucide-react';
 
-    export default function TransactionsPage() {
-    const [transactions, setTransactions] = useState<any[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
+interface Category {
+  id: string;
+  name: string;
+  color?: string;
+}
+
+interface Transaction {
+  id: string;
+  amount: number;
+  type: 'INCOME' | 'EXPENSE';
+  date: string;
+  note: string | null;
+  category: Category;
+}
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
+export default function TransactionsPage() {
+  // Secara otomatis mendeteksi bulan saat ini untuk Time Matrix
+  const [activeMonth, setActiveMonth] = useState(new Date().getMonth()); 
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    fetchTransactions();
+  }, []);
+
+  const fetchTransactions = async () => {
+    setIsLoading(true);
+    try {
+      const token = localStorage.getItem('accessToken');
+      if (!token) return;
+
+      const res = await fetch(`${API_URL}/transactions`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      
+      if (res.ok) {
+        setTransactions(data);
+      }
+    } catch (error) {
+      console.error('Gagal memuat rekam jejak transaksi:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Eksekusi Filter Ganda: Berdasarkan Bulan & Kata Kunci
+  const filteredTransactions = transactions.filter((trx) => {
+    const trxMonth = new Date(trx.date).getMonth();
+    const matchesMonth = trxMonth === activeMonth;
     
-    // State untuk Filter Data
-    const [filterType, setFilterType] = useState<'ALL' | 'INCOME' | 'EXPENSE'>('ALL');
-    const [searchQuery, setSearchQuery] = useState('');
+    const searchLower = searchQuery.toLowerCase();
+    const matchesSearch = 
+      trx.category.name.toLowerCase().includes(searchLower) ||
+      (trx.note && trx.note.toLowerCase().includes(searchLower));
 
-    useEffect(() => {
-        const fetchTransactions = async () => {
-        try {
-            const res = await fetchAPI('/transactions');
-            setTransactions(res.data || []);
-        } catch (error) {
-            console.error('Galat menarik log arus kas:', error);
-        } finally {
-            setIsLoading(false);
-        }
-        };
-        fetchTransactions();
-    }, []);
+    return matchesMonth && matchesSearch;
+  });
 
-    if (isLoading) {
-        return (
-        <div className="flex h-full items-center justify-center">
-            <div className="w-10 h-10 border-2 border-[#2962FF]/20 border-t-[#2962FF] rounded-full animate-spin"></div>
+  return (
+    <div className="p-6 md:p-10 min-h-screen">
+      
+      {/* Header & Navigasi Temporal */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-10 gap-6">
+        <div>
+          <h1 className="text-3xl font-black text-white tracking-tighter mb-2">Buku Besar</h1>
+          <p className="text-[#94A3B8] text-sm">Rekam jejak komputasi finansial Anda.</p>
         </div>
-        );
-    }
 
-    // Logika Penyaringan (Filtering & Searching) di sisi Klien
-    const filteredTransactions = transactions.filter(tx => {
-        const matchType = filterType === 'ALL' || tx.category?.type === filterType;
-        const matchSearch = (tx.description || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
-                            (tx.category?.name || '').toLowerCase().includes(searchQuery.toLowerCase());
-        return matchType && matchSearch;
-    });
+        {/* Time Matrix Selector */}
+        <div className="w-full md:w-auto overflow-x-auto custom-scrollbar pb-2 md:pb-0">
+          <div className="flex bg-[#0A1428]/80 backdrop-blur-md border border-white/5 p-1.5 rounded-2xl w-max">
+            {MONTHS.map((month, index) => (
+              <button
+                key={month}
+                onClick={() => setActiveMonth(index)}
+                className={`px-5 py-2 text-xs font-bold rounded-xl transition-all duration-300 ${
+                  activeMonth === index 
+                    ? 'bg-[#2962FF] text-white shadow-[0_0_15px_rgba(41,98,255,0.4)]' 
+                    : 'text-[#94A3B8] hover:text-white hover:bg-white/5'
+                }`}
+              >
+                {month}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
 
-    return (
-        <div className="max-w-5xl mx-auto w-full flex flex-col gap-8">
-        
-        {/* HEADER SECTION */}
-        <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-            <div>
-            <h1 className="text-3xl font-bold text-white tracking-tight flex items-center gap-3">
-                <ArrowRightLeft className="text-[#2962FF]" size={28} />
-                Buku Besar Arus Kas
-            </h1>
-            <p className="text-[#94A3B8] text-sm mt-2 font-medium tracking-wide">
-                Rekam jejak seluruh pergerakan aset Anda.
-            </p>
-            </div>
+      {/* Control Panel (Pencarian & Filter) */}
+      <div className="flex flex-col sm:flex-row gap-4 mb-8">
+        <div className="relative flex-1 group">
+          <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+            <Search size={18} className="text-[#94A3B8] group-focus-within:text-[#00E5FF] transition-colors" />
+          </div>
+          <input 
+            type="text" 
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-[#0A1428]/60 backdrop-blur-md border border-white/5 rounded-2xl pl-12 pr-4 py-4 text-sm text-white focus:outline-none focus:border-[#00E5FF] transition-colors placeholder:text-white/20"
+            placeholder="Dekripsi transaksi (cari nama kategori atau catatan)..."
+          />
+        </div>
+        <button className="flex items-center justify-center gap-2 bg-[#0A1428]/60 backdrop-blur-md border border-white/5 hover:border-white/20 text-white px-6 py-4 rounded-2xl text-sm font-bold transition-all">
+          <Filter size={18} className="text-[#00E5FF]" />
+          Filter
+        </button>
+      </div>
 
-            {/* Action Bar (Search & Filter) */}
-            <div className="flex items-center gap-3 w-full md:w-auto">
-            {/* Search Box */}
-            <div className="relative flex-1 md:w-64">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Search size={16} className="text-[#94A3B8]" />
-                </div>
-                <input 
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-[#0A1428] border border-white/5 py-2.5 pl-10 pr-4 rounded-xl text-sm text-white focus:border-[#2962FF] outline-none transition-all placeholder:text-[#94A3B8]/50"
-                placeholder="Cari transaksi..."
-                />
-            </div>
+      {/* Area Render Transaksi */}
+      {isLoading ? (
+        <div className="flex justify-center py-20">
+          <Loader2 className="animate-spin text-[#00E5FF]" size={40} />
+        </div>
+      ) : filteredTransactions.length === 0 ? (
+        <div className="text-center py-20 bg-[#0A1428]/40 border border-white/5 rounded-3xl">
+          <p className="text-[#94A3B8] text-sm">Tidak ada rekam jejak finansial di matriks waktu ini.</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {filteredTransactions.map((trx) => {
+            // Gunakan warna kategori dari database, fallback ke biru jika kosong
+            const glowColor = trx.category.color || '#2962FF';
             
-            {/* Filter Pills */}
-            <div className="flex bg-[#0A1428] border border-white/5 p-1 rounded-xl">
-                <button 
-                onClick={() => setFilterType('ALL')}
-                className={`px-4 py-1.5 rounded-lg text-xs font-bold tracking-widest uppercase transition-all ${filterType === 'ALL' ? 'bg-white/10 text-white' : 'text-[#94A3B8] hover:text-white'}`}
-                >
-                Semua
-                </button>
-                <button 
-                onClick={() => setFilterType('INCOME')}
-                className={`px-4 py-1.5 rounded-lg text-xs font-bold tracking-widest uppercase transition-all ${filterType === 'INCOME' ? 'bg-[#00E5FF]/20 text-[#00E5FF]' : 'text-[#94A3B8] hover:text-white'}`}
-                >
-                (+)
-                </button>
-                <button 
-                onClick={() => setFilterType('EXPENSE')}
-                className={`px-4 py-1.5 rounded-lg text-xs font-bold tracking-widest uppercase transition-all ${filterType === 'EXPENSE' ? 'bg-[#536DFE]/20 text-[#536DFE]' : 'text-[#94A3B8] hover:text-white'}`}
-                >
-                (-)
-                </button>
-            </div>
-            </div>
-        </header>
+            return (
+              <div 
+                key={trx.id} 
+                className="group flex flex-col sm:flex-row items-start sm:items-center justify-between bg-[#040B16] border border-white/5 p-5 rounded-2xl hover:border-white/20 transition-all duration-300 relative overflow-hidden"
+              >
+                {/* Latar Belakang Glow */}
+                <div 
+                  className="absolute -left-10 w-24 h-full blur-[40px] opacity-10 group-hover:opacity-20 transition-opacity pointer-events-none"
+                  style={{ backgroundColor: glowColor }}
+                ></div>
 
-        {/* FEED DATA SECTION */}
-        <div className="bg-[#0A1428]/60 backdrop-blur-xl border border-white/5 rounded-[2rem] p-6 shadow-2xl relative overflow-hidden">
-            {/* Subtle Glow */}
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-1/2 bg-[#2962FF]/5 blur-[100px] rounded-full pointer-events-none"></div>
+                <div className="flex items-center gap-5 relative z-10 w-full sm:w-auto mb-4 sm:mb-0">
+                  {/* Ikon Indikator */}
+                  <div 
+                    className="w-12 h-12 rounded-xl flex items-center justify-center border"
+                    style={{ 
+                      backgroundColor: `${glowColor}15`, 
+                      borderColor: `${glowColor}40`, 
+                      color: glowColor 
+                    }}
+                  >
+                    {trx.type === 'INCOME' ? <ArrowDownRight size={24} /> : <ArrowUpRight size={24} />}
+                  </div>
 
-            <div className="relative z-10 flex flex-col gap-2">
-            {filteredTransactions.length === 0 ? (
-                <div className="py-20 flex flex-col items-center justify-center text-[#94A3B8]">
-                <Filter size={32} className="opacity-50 mb-3" />
-                <p className="text-xs font-bold tracking-widest uppercase opacity-50">Tidak Ditemukan Rekam Jejak</p>
+                  {/* Meta Data */}
+                  <div>
+                    <h3 className="text-white font-bold text-base mb-1">{trx.category.name}</h3>
+                    <div className="flex items-center gap-3 text-xs text-[#94A3B8]">
+                      <span className="flex items-center gap-1">
+                        <Calendar size={12}/> 
+                        {new Date(trx.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </span>
+                      {trx.note && (
+                        <>
+                          <span className="w-1 h-1 rounded-full bg-white/20"></span>
+                          <span className="truncate max-w-[150px]">{trx.note}</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
                 </div>
-            ) : (
-                filteredTransactions.map((tx) => {
-                const isIncome = tx.category?.type === 'INCOME';
-                const txDate = new Date(tx.createdAt);
-                
-                return (
-                    <div key={tx.id} className="group relative bg-[#040B16] border border-transparent hover:border-white/5 p-4 rounded-2xl transition-all duration-300 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    
-                    {/* Left Side: Icon & Details */}
-                    <div className="flex items-center gap-4">
-                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center border ${isIncome ? 'bg-[#00E5FF]/10 border-[#00E5FF]/20 text-[#00E5FF]' : 'bg-[#536DFE]/10 border-[#536DFE]/20 text-[#536DFE]'}`}>
-                        {isIncome ? <ArrowDownRight size={20} /> : <ArrowUpRight size={20} />}
-                        </div>
-                        <div>
-                        <h3 className="font-bold text-white text-base">{tx.category?.name || 'Uncategorized'}</h3>
-                        <p className="text-sm text-[#94A3B8] mt-0.5">{tx.description || '-'}</p>
-                        </div>
-                    </div>
 
-                    {/* Right Side: Amount & Date */}
-                    <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center pl-16 sm:pl-0">
-                        <p className={`font-black font-mono text-lg tracking-tight ${isIncome ? 'text-[#00E5FF]' : 'text-white'}`}>
-                        {isIncome ? '+' : '-'} Rp {tx.amount.toLocaleString('id-ID')}
-                        </p>
-                        <p className="text-xs text-[#94A3B8] font-bold tracking-widest uppercase mt-1">
-                        {txDate.toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })}
-                        </p>
-                    </div>
-                    
-                    </div>
-                );
-                })
-            )}
-            </div>
+                {/* Area Nominal & Aksi */}
+                <div className="flex items-center justify-between sm:justify-end w-full sm:w-auto gap-6 relative z-10 pl-17 sm:pl-0">
+                  <div className="text-right">
+                    <p className={`font-black tracking-wider ${trx.type === 'INCOME' ? 'text-[#00E5FF]' : 'text-white'}`}>
+                      {trx.type === 'INCOME' ? '+' : '-'} Rp {trx.amount.toLocaleString('id-ID')}
+                    </p>
+                    <p className="text-[10px] font-bold text-[#94A3B8] uppercase tracking-widest mt-1">Volume</p>
+                  </div>
+                  <button className="p-2 text-[#94A3B8] hover:text-white bg-white/5 hover:bg-white/10 rounded-xl transition-colors">
+                    <MoreHorizontal size={18} />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
         </div>
-        </div>
-    );
-    }
+      )}
+    </div>
+  );
+}

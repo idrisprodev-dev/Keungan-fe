@@ -5,7 +5,7 @@ export async function fetchAPI(endpoint: string, options: RequestInit = {}) {
   
   // Mengambil token JWT dari pangkalan data peramban (browser)
   // Pengecekan 'window' wajib dilakukan di Next.js untuk menghindari error Server-Side Rendering (SSR)
-  const token = typeof window !== 'undefined' ? localStorage.getItem('ohduit_jwt') : null;
+  const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
   
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -24,7 +24,7 @@ export async function fetchAPI(endpoint: string, options: RequestInit = {}) {
     // Jika token kedaluwarsa atau tidak valid, arahkan pengguna untuk masuk kembali
     if (response.status === 401) {
       if (typeof window !== 'undefined') {
-        localStorage.removeItem('ohduit_jwt');
+        localStorage.removeItem('accessToken');
         window.location.href = '/'; 
       }
     }

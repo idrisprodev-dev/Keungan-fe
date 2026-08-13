@@ -1,48 +1,62 @@
 'use client';
 
-import { useEffect, Suspense } from 'react';
+import { useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
-function AuthInterceptor() {
+export default function AuthSuccessPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    // 1. Menangkap token JWT rahasia dari URL yang dikirim oleh backend
     const token = searchParams.get('token');
     
     if (token) {
-      // 2. Mengamankan token ke dalam brankas lokal browser
-      localStorage.setItem('ohduit_jwt', token);
+      // 1. Simpan token ke localStorage
+      localStorage.setItem('accessToken', token);
       
-      // 3. Langsung melempar pengguna ke ruang kendali (Dasbor)
-      router.push('/dashboard');
+      // 2. Langsung cek status user dengan token tersebut
+      checkUserStatus(token);
     } else {
-      // Jika ada penyusup yang mengakses rute ini tanpa token, tendang ke halaman awal
       router.push('/');
     }
-  }, [router, searchParams]);
+  }, [searchParams, router]);
+
+  const checkUserStatus = async (token: string) => {
+    try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+      
+      // Menggunakan fetch biasa agar token PASTI terkirim
+      const res = await fetch(`${API_URL}/categories`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!res.ok) throw new Error('Gagal mengecek kategori');
+
+      const categories = await res.json();
+
+      // Logika Redirect
+      if (categories && categories.length > 0) {
+        router.push('/dashboard'); // User Lama (Sudah punya kategori)
+      } else {
+        router.push('/onboarding'); // User Baru (Belum punya kategori)
+      }
+      
+    } catch (error) {
+      console.error('Error saat cek status user:', error);
+      // Fallback: Jika error jaringan, amankan user ke onboarding daripada tersangkut
+      router.push('/onboarding');
+    }
+  };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-slate-900 text-emerald-400">
-      <svg className="animate-spin h-10 w-10 mb-4 text-emerald-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-      </svg>
-      <p className="text-xl font-bold animate-pulse">Mengamankan Sesi Anda...</p>
-    </div>
-  );
-}
-
-// Suspense wajib digunakan di Next.js saat kita membaca URL Parameter agar tidak terjadi galat saat Build
-export default function AuthSuccessPage() {
-  return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center text-slate-400">
-        Memuat...
+    <div className="min-h-screen bg-[#040B16] flex items-center justify-center text-white">
+      <div className="flex flex-col items-center gap-5">
+        <div className="w-12 h-12 border-4 border-[#00E5FF]/20 border-t-[#00E5FF] rounded-full animate-spin"></div>
+        <p className="text-sm font-medium text-[#94A3B8]">Memproses otentikasi...</p>
       </div>
-    }>
-      <AuthInterceptor />
-    </Suspense>
+    </div>
   );
 }

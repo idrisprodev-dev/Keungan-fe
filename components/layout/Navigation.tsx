@@ -3,10 +3,13 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Wallet, ArrowRightLeft, PieChart, Target, Plus } from 'lucide-react';
+import TransactionModal from '../features/TransactionModal';
+import { useState } from 'react';
 
 export default function Navigation() {
   const pathname = usePathname();
   
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const menuItems = [
     { icon: Wallet, href: '/dashboard', label: 'Hub' },
     { icon: ArrowRightLeft, href: '/(dashboard)/transactions', label: 'Tabungan' },
@@ -16,6 +19,9 @@ export default function Navigation() {
 
   return (
     <>
+      {/* Modal Transaction */}
+      <TransactionModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+
       {/* DESKTOP: Floating Capsule */}
       <nav className="hidden md:flex flex-col fixed left-6 top-6 bottom-6 w-20 bg-[#0A1428]/60 backdrop-blur-2xl border border-white/5 rounded-3xl py-8 items-center justify-between z-50 shadow-[0_0_40px_rgba(0,0,0,0.5)]">
         
@@ -54,14 +60,13 @@ export default function Navigation() {
 
         {/* Primary Floating Action */}
         <div className="px-3 w-full">
-          <Link 
-            href="?action=add" 
-            scroll={false} 
-            className="relative group flex justify-center items-center p-3 bg-gradient-to-b from-[#2962FF] to-[#1E40AF] text-white rounded-2xl hover:scale-105 transition-all duration-300 shadow-[0_0_20px_rgba(41,98,255,0.4)] border border-[#00E5FF]/30"
+          <button 
+            onClick={() => setIsModalOpen(true)} 
+            className="w-full relative group flex justify-center items-center p-3 bg-gradient-to-b from-[#2962FF] to-[#1E40AF] text-white rounded-2xl hover:scale-105 transition-all duration-300 shadow-[0_0_20px_rgba(41,98,255,0.4)] border border-[#00E5FF]/30"
           >
             <Plus size={24} strokeWidth={3} />
             <div className="absolute inset-0 bg-[#00E5FF] opacity-0 group-hover:opacity-20 blur-md rounded-2xl transition-opacity duration-300" />
-          </Link>
+          </button>
         </div>
       </nav>
 
@@ -84,6 +89,12 @@ export default function Navigation() {
           );
         })}
       </nav>
+
+      {/* Modal Transaction */}
+      <TransactionModal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+      />
     </>
   );
 }
