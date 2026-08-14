@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { Target, Plus, Zap, Rocket, ChevronRight } from 'lucide-react';
-import { fetchAPI } from '@/app/lib/api';
 
 export default function GoalsPage() {
   const [goals, setGoals] = useState<any[]>([]);
@@ -24,7 +23,7 @@ export default function GoalsPage() {
   const fetchGoals = async () => {
     try {
       const res = await fetchAPI('/goals');
-      setGoals(res.data || []);
+      setGoals(res.data! || []);
     } catch (error) {
       console.error('Galat menarik data proyeksi:', error);
     } finally {
@@ -214,4 +213,8 @@ export default function GoalsPage() {
       </div>
     </div>
   );
+}
+
+function fetchAPI(arg0: string) {
+  throw new Error('Function not implemented.');
 }

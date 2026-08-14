@@ -1,35 +1,41 @@
-const BASE_URL = 'http://localhost:3000';
+// src/lib/api.ts
+import axios from 'axios';
+import Cookies from 'js-cookie';
 
-export async function fetchAPI(endpoint: string, options: RequestInit = {}) {
-  const url = `${BASE_URL}${endpoint}`;
-  
-  // Mengambil token JWT dari pangkalan data peramban (browser)
-  // Pengecekan 'window' wajib dilakukan di Next.js untuk menghindari error Server-Side Rendering (SSR)
-  const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
-  
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    ...(options.headers as Record<string, string>),
-  };
+// Tembak langsung ke Backend NestJS Anda
+const api = axios.create({
+  baseURL: 'http://localhost:3000',
+  withCredentials: true, // Penting untuk CORS
+});
 
-  // Jika token tersedia, sisipkan sebagai kunci otorisasi standar (Bearer)
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
+// Interceptor: Otomatis menyisipkan Token sebelum request terkirim
+api.interceptors.request.use(
+  (config) => {
+    // Kita akan menyimpan JWT dari Backend ke dalam Cookie bernama 'access_token'
+    const token = Cookies.get('access_token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
   }
+);
 
-  const response = await fetch(url, { ...options, headers });
-  const data = await response.json();
-
-  if (!response.ok) {
-    // Jika token kedaluwarsa atau tidak valid, arahkan pengguna untuk masuk kembali
-    if (response.status === 401) {
+// Interceptor: Menangkap error jika token kadaluarsa (401)
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response && error.response.status === 401) {
+      // Jika token mati/tidak valid, tendang user kembali ke halaman login
+      Cookies.remove('access_token');
       if (typeof window !== 'undefined') {
-        localStorage.removeItem('accessToken');
-        window.location.href = '/'; 
+        window.location.href = '/login';
       }
     }
-    throw new Error(data.message || 'Terjadi kesalahan pada server');
+    return Promise.reject(error);
   }
+);
 
-  return data;
-}
+export default api;
